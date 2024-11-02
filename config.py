@@ -234,6 +234,7 @@ class UserConfig:
             "claude_systemprompt": self.claude_systemprompt,
             "api_key": self.api_key,
             "api_url": self.api_url,
+            "preset_prompts": []
         }
 
     def user_init(self, user_id = None):

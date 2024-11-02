@@ -39,8 +39,8 @@ from utils.i18n import strings
 from utils.scripts import GetMesageInfo, safe_get, is_emoji
 
 from telegram.constants import ChatAction
-from telegram import BotCommand, InlineKeyboardMarkup, InlineQueryResultArticle, InputTextMessageContent, Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
-from telegram.ext import CommandHandler, MessageHandler, ApplicationBuilder, filters, CallbackQueryHandler, Application, AIORateLimiter, InlineQueryHandler, ContextTypes
+from telegram import BotCommand, InlineKeyboardMarkup, InlineQueryResultArticle, InputTextMessageContent, Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove, InlineKeyboardButton
+from telegram.ext import CommandHandler, MessageHandler, ApplicationBuilder, filters, CallbackQueryHandler, Application, AIORateLimiter, InlineQueryHandler, ContextTypes, ConversationHandler
 from datetime import timedelta
 
 import asyncio
@@ -82,6 +82,8 @@ time_stamps = defaultdict(lambda: [])
 @decorators.Authorization
 @decorators.APICheck
 async def command_bot(update, context, language=None, prompt=translator_prompt, title="", has_command=True):
+    if context.user_data.get('conversation_active'):
+        return
     stop_event.clear()
     message, rawtext, image_url, chatid, messageid, reply_to_message_text, update_message, message_thread_id, convo_id, file_url, reply_to_message_file_content, voice_text = await GetMesageInfo(update, context)
 
@@ -444,7 +446,7 @@ async def button_press(update, context):
     callback_query = update.callback_query
     info_message = update_info_message(convo_id)
     await callback_query.answer()
-    data = callback_query.data
+    shdata = callback_query.data
     banner = strings['message_banner'][get_current_lang(convo_id)]
     import telegram
     try:
@@ -597,7 +599,6 @@ async def inlinequery(update: Update, context) -> None:
             InlineQueryResultArticle(
                 id=chatid,
                 title=f"{engine}",
-                thumbnail_url="https://pb.yym68686.top/TTGk",
                 description=f"{result}",
                 input_message_content=InputTextMessageContent(escape(result, italic=False), parse_mode='MarkdownV2')),
         ]
@@ -672,6 +673,89 @@ async def info(update, context):
     )
     await delete_message(update, context, [message.message_id, user_message_id])
 
+# Define states for conversation
+WAITING, ADD_PROMPT, SELECT_PROMPT, DELETE_PROMPT = range(4)
+
+@decorators.PrintMessage
+@decorators.GroupAuthorization
+@decorators.Authorization
+async def manage_prompts(update, context):
+    keyboard = [
+        [InlineKeyboardButton("Add Prompt", callback_data='add')],
+        [InlineKeyboardButton("Select Prompt", callback_data='select')],
+        [InlineKeyboardButton("Delete Prompt", callback_data='delete')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    _, _, _, _, _, _, _, _, convo_id, _, _, _ = await GetMesageInfo(update, context)
+    preset_prompts = Users.get_config(convo_id, "preset_prompts")
+    message = f"{format_preset_prompts(preset_prompts)}\n 请选择一个操作："
+    await update.message.reply_text(message, reply_markup=reply_markup)
+    return WAITING
+
+async def prompts_button(update, context):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == 'add':
+        await query.edit_message_text(text="请发送要添加的 prompt.")
+        return ADD_PROMPT
+
+    elif query.data == 'select' or query.data == 'delete':
+        convo_id = (await GetMesageInfo(update, context))[8]
+        preset_prompts = Users.get_config(convo_id, "preset_prompts")
+        if not preset_prompts:
+            message = "当前还没有预设 prompts, 请先添加"
+            await query.edit_message_text(text=message)
+            return ConversationHandler.END
+        else:
+            message = f"请选择 prompts: \n`"
+            reply_keyboard = [[InlineKeyboardButton(prompt, callback_data=index)] for index, prompt in enumerate(preset_prompts)]
+            markup = InlineKeyboardMarkup(reply_keyboard)
+            await query.edit_message_reply_markup(reply_markup=markup)
+            if query.data == 'select':
+                return SELECT_PROMPT
+            else:
+                return DELETE_PROMPT
+
+def format_preset_prompts(prompts):
+    return "当前还没有设定" if not prompts else f"以下是已经设定的 prompts:\n{'\n'.join(f'{i+1}. {item}' for i, item in enumerate(prompts))}"
+
+async def select_prompts(update, context):
+    _, _, _, _, _, _, _, _, convo_id, _, _, _ = await GetMesageInfo(update, context)
+    preset_prompts = Users.get_config(convo_id, "preset_prompts")
+    query = update.callback_query
+    selected_prompt = preset_prompts[int(query.data)]
+    reset_ENGINE(convo_id, selected_prompt)
+    message = f"Prompt 设置为: `{selected_prompt}`"
+    await query.edit_message_text(text=message)
+    return ConversationHandler.END
+
+async def del_prompts(update, context): # when user input /show_prompts, return all the preset
+    _, _, _, _, _, _, _, _, convo_id, _, _, _ = await GetMesageInfo(update, context)
+    preset_prompts = Users.get_config(convo_id, "preset_prompts")
+    query = update.callback_query
+    selected_prompt = int(query.data)
+    preset_prompts.pop(selected_prompt)
+    Users.set_config(convo_id, "preset_prompts", preset_prompts)
+    message = "删除 prompt 成功!\n" + format_preset_prompts(preset_prompts)
+    await query.edit_message_text(text = message)
+    return ConversationHandler.END
+
+async def add_prompts(update, context): # when user input /show_prompts, return all the preset
+    _, _, _, _, _, _, _, _, convo_id, _, _, _ = await GetMesageInfo(update, context)
+    print("in add_prompts")
+    preset_prompts = Users.get_config(convo_id, "preset_prompts")
+    prompt = update.message.text
+    preset_prompts.append(prompt)
+    Users.set_config(convo_id, "preset_prompts", preset_prompts)
+    message = "添加 prompt 成功!\n" + format_preset_prompts(preset_prompts)
+    await update.message.reply_text(escape(message, italic=False), parse_mode='MarkdownV2', disable_web_page_preview=True)
+    return ConversationHandler.END
+
+async def cancel(update, context):
+    await update.message.reply_text('操作已取消。')
+    return ConversationHandler.END
+
 @decorators.PrintMessage
 @decorators.GroupAuthorization
 @decorators.Authorization
@@ -701,22 +785,7 @@ async def start(update, context): # 当用户输入/start时，返回文本
         api_key = context.args[0]
         Users.set_config(convo_id, "api_key", api_key)
         Users.set_config(convo_id, "api_url", "https://api.openai.com/v1/chat/completions")
-        # if GET_MODELS:
-        #     update_initial_model()
 
-    # message = (
-    #     ">Block quotation started\n"
-    #     ">Block quotation continued\n"
-    #     ">Block quotation continued\n"
-    #     ">Block quotation continued\n"
-    #     ">The last line of the block quotation\n"
-    #     "**>The expandable block quotation started right after the previous block quotation\n"
-    #     ">It is separated from the previous block quotation by an empty bold entity\n"
-    #     ">Expandable block quotation continued\n"
-    #     ">Hidden by default part of the expandable block quotation started\n"
-    #     ">Expandable block quotation continued\n"
-    #     ">The last line of the expandable block quotation with the expandability mark||\n"
-    # )
     # await update.message.reply_text(message, parse_mode='MarkdownV2', disable_web_page_preview=True)
     await update.message.reply_text(escape(message, italic=False), parse_mode='MarkdownV2', disable_web_page_preview=True)
 
@@ -741,6 +810,7 @@ async def post_init(application: Application) -> None:
     await application.bot.set_my_commands([
         BotCommand('info', 'Basic information'),
         BotCommand('reset', 'Reset the bot'),
+        BotCommand('prompts', 'Manage preset prompts'),
         BotCommand('start', 'Start the bot'),
         BotCommand('en2zh', 'Translate to Chinese'),
         BotCommand('zh2en', 'Translate to English'),
@@ -770,12 +840,26 @@ if __name__ == '__main__':
         .build()
     )
 
+    # Set up the conversation handler
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('prompts', manage_prompts)],
+        states={
+            WAITING: [CallbackQueryHandler(prompts_button)],
+            ADD_PROMPT: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_prompts)],
+            SELECT_PROMPT: [CallbackQueryHandler(select_prompts)],
+            DELETE_PROMPT: [CallbackQueryHandler(del_prompts)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+    )
+
+    application.add_handler(conv_handler)
     application.add_handler(CommandHandler("info", info))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("reset", reset_chat))
     application.add_handler(CommandHandler("en2zh", lambda update, context: command_bot(update, context, "Simplified Chinese")))
     application.add_handler(CommandHandler("zh2en", lambda update, context: command_bot(update, context, "english")))
     application.add_handler(InlineQueryHandler(inlinequery))
+#    application.add_handler(CallbackQueryHandler(prompts_button))
     application.add_handler(CallbackQueryHandler(button_press))
     application.add_handler(MessageHandler((filters.TEXT | filters.VOICE) & ~filters.COMMAND, lambda update, context: command_bot(update, context, prompt=None, has_command=False), block = False))
     application.add_handler(MessageHandler(
