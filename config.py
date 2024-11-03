@@ -171,7 +171,7 @@ class UserConfig:
         language="English",
         api_url="https://api.openai.com/v1/chat/completions",
         api_key=None,
-        engine="gpt-4o",
+        engine="gpt-4o-mini",
         mode="global",
         preferences=None,
         plugins=None,
@@ -374,7 +374,7 @@ def update_info_message(user_id = None):
         f"**🛜 WEB HOOK:** `{WEB_HOOK}`\n\n" if WEB_HOOK else "",
         f"**🚰 Tokens usage:** `{get_robot(user_id)[0].tokens_usage[str(user_id)]}`\n\n" if get_robot(user_id)[0] else "",
         f"**🃏 NICK:** `{NICK}`\n\n" if NICK else "",
-        f"**📖 Version:** `{check_for_updates()}`\n\n",
+#        f"**📖 Version:** `{check_for_updates()}`\n\n",
     ])
 
 def reset_ENGINE(chat_id, message=None):
