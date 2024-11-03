@@ -446,7 +446,7 @@ async def button_press(update, context):
     callback_query = update.callback_query
     info_message = update_info_message(convo_id)
     await callback_query.answer()
-    shdata = callback_query.data
+    data = callback_query.data
     banner = strings['message_banner'][get_current_lang(convo_id)]
     import telegram
     try:
