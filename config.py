@@ -18,7 +18,7 @@ RESET_TIME = int(os.environ.get('RESET_TIME', '3600'))
 if RESET_TIME < 60:
     RESET_TIME = 60
 
-GPT_ENGINE = os.environ.get('GPT_ENGINE', 'gpt-4o')
+GPT_ENGINE = os.environ.get('GPT_ENGINE', 'gpt-4o-mini')
 API_URL = os.environ.get('API_URL', 'https://api.openai.com/v1/chat/completions')
 API = os.environ.get('API', None)
 WEB_HOOK = os.environ.get('WEB_HOOK', None)
@@ -529,11 +529,8 @@ initial_model = [
     "gpt-4o-mini",
     "o1-mini",
     "o1-preview",
-    "claude-3-opus-20240229",
     "claude-3-5-sonnet-20241022",
-    # "gpt-4-turbo-2024-04-09",
-    # "gpt-3.5-turbo",
-    # "claude-3-haiku-20240307",
+    "claude-3-5-haiku-20241022",
 ]
 
 if GROQ_API_KEY:
