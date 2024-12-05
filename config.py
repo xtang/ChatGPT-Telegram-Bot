@@ -5,6 +5,7 @@ load_dotenv()
 
 from utils.i18n import strings
 from datetime import datetime
+
 from ModelMerge.src.ModelMerge.utils import prompt
 from ModelMerge.src.ModelMerge.models import chatgpt, groq, claude3, gemini, vertex, PLUGINS, whisper, DuckChat
 from ModelMerge.src.ModelMerge.models.base import BaseAPI
@@ -572,6 +573,8 @@ def update_initial_model():
             if "whisper" in model_item:
                 continue
             if "moderation" in model_item:
+                continue
+            if "embedding" in model_item:
                 continue
             set_models.add(model_item)
             # parts = [part for segment in model_item.split("-") for part in segment.split("@")]
