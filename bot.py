@@ -688,7 +688,8 @@ async def manage_prompts(update, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
     _, _, _, _, _, _, _, _, convo_id, _, _, _ = await GetMesageInfo(update, context)
     preset_prompts = Users.get_config(convo_id, "preset_prompts")
-    message = f"{format_preset_prompts(preset_prompts)}\n 请选择一个操作："
+    nl = '\n'
+    message = f"{format_preset_prompts(preset_prompts)}{nl} 请选择一个操作："
     await update.message.reply_text(message, reply_markup=reply_markup)
     return WAITING
 
@@ -708,7 +709,8 @@ async def prompts_button(update, context):
             await query.edit_message_text(text=message)
             return ConversationHandler.END
         else:
-            message = f"请选择 prompts: \n`"
+            nl='\n'
+            message = f"请选择 prompts: {nl}`"
             reply_keyboard = [[InlineKeyboardButton(prompt, callback_data=index)] for index, prompt in enumerate(preset_prompts)]
             markup = InlineKeyboardMarkup(reply_keyboard)
             await query.edit_message_reply_markup(reply_markup=markup)
@@ -718,7 +720,8 @@ async def prompts_button(update, context):
                 return DELETE_PROMPT
 
 def format_preset_prompts(prompts):
-    return "当前还没有设定" if not prompts else f"以下是已经设定的 prompts:\n{'\n'.join(f'{i+1}. {item}' for i, item in enumerate(prompts))}"
+    nl = '\n'
+    return "当前还没有设定" if not prompts else f"以下是已经设定的 prompts:{nl}{nl.join(f'{i+1}. {item}' for i, item in enumerate(prompts))}"
 
 async def select_prompts(update, context):
     _, _, _, _, _, _, _, _, convo_id, _, _, _ = await GetMesageInfo(update, context)
